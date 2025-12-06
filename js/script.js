@@ -1,6 +1,7 @@
 // --- Variáveis Globais e Constantes ---
 const CACHE_DURATION_MINUTES = 30;
 let languageChartInstance = null; // Para manter a referência do gráfico
+const STREAK_API_BASE_URL = 'https://git.io/streak-stat?user='; // NOVA CONSTANTE PARA A API DE STREAK
 
 // Mapa de cores para linguagens populares
 const languageColors = {
@@ -44,7 +45,7 @@ const following = document.getElementById('following');
 const publicRepos = document.getElementById('publicRepos');
 const publicGists = document.getElementById('publicGists');
 const totalStars = document.getElementById('totalStars');
-const currentStreakDisplay = document.getElementById('currentStreak'); // CORREÇÃO: Renomeado para evitar conflito
+const currentStreakDisplay = document.getElementById('currentStreak'); 
 
 // Elementos para exibição das linguagens
 const noLanguageMessage = document.getElementById('noLanguageMessage');
@@ -110,10 +111,35 @@ async function getCombinedLanguageStats(repos) {
     return languageStats;
 }
 
+/**
+ * Busca a sequência atual de contribuições usando a API de terceiros.
+ * @param {string} username - O nome de usuário do GitHub.
+ * @returns {Promise<string>} O número da sequência ou "--" em caso de erro.
+ */
+async function getCurrentStreak(username) {
+    try {
+        const response = await fetch(`${STREAK_API_BASE_URL}${username}`);
+        if (!response.ok) {
+            console.warn(`Erro ao buscar streak para ${username}: ${response.statusText}`);
+            return '--'; 
+        }
+        const data = await response.json();
+        
+        // A API retorna um objeto com várias estatísticas, incluindo 'currentStreak'
+        if (data.currentStreak !== undefined) {
+            return String(data.currentStreak);
+        }
+        return '--'; // Se o campo não for encontrado no JSON
+    } catch (error) {
+        console.error(`Erro ao acessar a API de streak:`, error);
+        return '--'; // Retorna '--' em caso de erro de rede
+    }
+}
+
+
 // --- Funções de Exibição de Dados ---
 
 function displayData(data) {
-    // CORREÇÃO: Usando 'streakValue' para armazenar o valor da streak do objeto 'data'
     const { userData, totalStarsCount, sortedLanguages, popularRepos, currentStreak: streakValue } = data;
 
     avatar.src = userData.avatar_url;
@@ -127,7 +153,7 @@ function displayData(data) {
     publicRepos.textContent = userData.public_repos;
     publicGists.textContent = userData.public_gists;
     totalStars.textContent = totalStarsCount;
-    currentStreakDisplay.textContent = streakValue; // CORREÇÃO: Usa o elemento DOM correto
+    currentStreakDisplay.textContent = streakValue; 
 
     displayLanguagesAsChart(sortedLanguages);
     displayPopularRepos(popularRepos);
@@ -238,6 +264,7 @@ async function generateGitHubStats() {
     }
 
     try {
+        // 1. Busca de dados do usuário
         const userResponse = await fetch(`https://api.github.com/users/${username}`);
         if (!userResponse.ok) {
             if (userResponse.status === 404) showMessage("Nome de usuário do GitHub não encontrado.");
@@ -248,11 +275,10 @@ async function generateGitHubStats() {
         }
         const userData = await userResponse.json();
 
-        // 💡 NOTA IMPORTANTE: A API OFICIAL DO GITHUB NÃO FORNECE O 'CURRENT STREAK' DIRETAMENTE.
-        // O valor abaixo é um PLACEHOLDER para fins de exibição.
-        // O valor "0" é usado para preencher o campo e mostrar que ele está funcionando.
-        const simulatedStreak = "0"; 
+        // 2. Busca da sequência (streak)
+        const currentStreak = await getCurrentStreak(username); 
         
+        // 3. Busca de repositórios
         let allRepos = [];
         let page = 1;
         while (true) {
@@ -268,7 +294,6 @@ async function generateGitHubStats() {
         }
 
         const ownedPublicRepos = allRepos.filter(repo => !repo.private && !repo.fork);
-        // O cálculo de totalStarsCount foi mantido, resolvendo o problema de estrelas
         const totalStarsCount = ownedPublicRepos.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0);
         const sortedRepos = [...ownedPublicRepos].sort((a, b) => b.stargazers_count - a.stargazers_count);
         
@@ -280,7 +305,7 @@ async function generateGitHubStats() {
             totalStarsCount,
             sortedLanguages,
             popularRepos: sortedRepos.slice(0, 5),
-            currentStreak: simulatedStreak // Usando o valor simulado
+            currentStreak: currentStreak // NOVO: Valor real (ou '--') da API git.io
         };
 
         const cachePayload = { timestamp: new Date().getTime(), data: fullData };
