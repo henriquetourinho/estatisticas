@@ -44,6 +44,7 @@ const following = document.getElementById('following');
 const publicRepos = document.getElementById('publicRepos');
 const publicGists = document.getElementById('publicGists');
 const totalStars = document.getElementById('totalStars');
+const currentStreakDisplay = document.getElementById('currentStreak'); // CORREÇÃO: Renomeado para evitar conflito
 
 // Elementos para exibição das linguagens
 const noLanguageMessage = document.getElementById('noLanguageMessage');
@@ -112,7 +113,8 @@ async function getCombinedLanguageStats(repos) {
 // --- Funções de Exibição de Dados ---
 
 function displayData(data) {
-    const { userData, totalStarsCount, sortedLanguages, popularRepos } = data;
+    // CORREÇÃO: Usando 'streakValue' para armazenar o valor da streak do objeto 'data'
+    const { userData, totalStarsCount, sortedLanguages, popularRepos, currentStreak: streakValue } = data;
 
     avatar.src = userData.avatar_url;
     profileName.textContent = userData.name || userData.login;
@@ -125,6 +127,7 @@ function displayData(data) {
     publicRepos.textContent = userData.public_repos;
     publicGists.textContent = userData.public_gists;
     totalStars.textContent = totalStarsCount;
+    currentStreakDisplay.textContent = streakValue; // CORREÇÃO: Usa o elemento DOM correto
 
     displayLanguagesAsChart(sortedLanguages);
     displayPopularRepos(popularRepos);
@@ -245,6 +248,11 @@ async function generateGitHubStats() {
         }
         const userData = await userResponse.json();
 
+        // 💡 NOTA IMPORTANTE: A API OFICIAL DO GITHUB NÃO FORNECE O 'CURRENT STREAK' DIRETAMENTE.
+        // O valor abaixo é um PLACEHOLDER para fins de exibição.
+        // O valor "0" é usado para preencher o campo e mostrar que ele está funcionando.
+        const simulatedStreak = "0"; 
+        
         let allRepos = [];
         let page = 1;
         while (true) {
@@ -260,6 +268,7 @@ async function generateGitHubStats() {
         }
 
         const ownedPublicRepos = allRepos.filter(repo => !repo.private && !repo.fork);
+        // O cálculo de totalStarsCount foi mantido, resolvendo o problema de estrelas
         const totalStarsCount = ownedPublicRepos.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0);
         const sortedRepos = [...ownedPublicRepos].sort((a, b) => b.stargazers_count - a.stargazers_count);
         
@@ -270,7 +279,8 @@ async function generateGitHubStats() {
             userData,
             totalStarsCount,
             sortedLanguages,
-            popularRepos: sortedRepos.slice(0, 5)
+            popularRepos: sortedRepos.slice(0, 5),
+            currentStreak: simulatedStreak // Usando o valor simulado
         };
 
         const cachePayload = { timestamp: new Date().getTime(), data: fullData };
